@@ -1,0 +1,319 @@
+{
+  "name": "Checkpoint 1 - Agente Calificador de Leads - Inmobiliaria Balbi",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Checkpoint M1 · Agente base\n\n**1. Trigger:** Chat Trigger captura el mensaje del cliente.\n**2. AI Agent (Tools Agent):** conectado a Anthropic Chat Model (Claude Sonnet). System Prompt modular: Rol → Ámbito → Objetivo → Reglas → Prohibiciones → Escalamiento.\n**3. Guardrail:** Max Iterations = 8 (Options del nodo AI Agent, rango 5-10).\n**4. Tool lateral:** \"Registrar Lead en Notion\" conectada como herramienta (ai_tool), con descripción semántica de cuándo usarla y cuándo no.\n**5. Observabilidad:** Registro de Auditoría → Slack envía el log \"✅ Tarea completada\" con herramientas usadas, pasos intermedios (Execution Log) y respuesta final.",
+        "height": 380,
+        "width": 520,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "14a7c555-6e4d-4020-9f25-f75a9bf407cd",
+      "name": "Nota - Requisitos del Checkpoint"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        496
+      ],
+      "id": "19a2764f-4c6a-405e-af83-a014dfe00ebe",
+      "name": "Chat Trigger - Consulta del Cliente",
+      "webhookId": "a1000001-0000-4000-8000-0000000000ff"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "# ROL\nSos el Asistente de Calificación de Leads de Inmobiliaria Balbi, una inmobiliaria de Rosario, Argentina. Atendés el primer contacto de clientes que escriben por el chat.\n\n# ÁMBITO\nSolo atendés consultas del rubro inmobiliario de Inmobiliaria Balbi: compra, venta, alquiler y tasación de propiedades en Rosario y alrededores. Cualquier tema ajeno al rubro queda fuera de tu alcance.\n\n# OBJETIVO\n1. Responder la consulta del cliente de forma clara y útil.\n2. Calificar al lead: CALIENTE (intención concreta con zona, presupuesto o plazo), TIBIO (interés real sin datos concretos), FRÍO (solo informativo) o ESCALAR A ASESOR.\n3. Si el lead es CALIENTE, TIBIO o ESCALAR A ASESOR y dejó nombre y teléfono o correo, registrarlo con la herramienta \"Registrar Lead en Notion\". Si falta el contacto, pedíselo amablemente.\n\n# REGLAS\n- Español rioplatense, cordial y profesional, tratando de \"usted\". Sin lenguaje inclusivo.\n- Máximo 120 palabras. Cerrá invitando a coordinar una visita o una llamada.\n- No inventes precios, expensas, metros, direcciones, disponibilidad ni honorarios: indicá que un asesor los va a confirmar.\n- Usá la herramienta como máximo una vez por conversación y nunca para leads FRÍOS.\n\n# PROHIBICIONES (lo que NO podés hacer)\n- No cerrar operaciones, confirmar reservas, aceptar señas ni negociar precios o comisiones.\n- No pedir DNI, CUIT, datos bancarios, contraseñas ni tarjetas.\n- No registrar consultas sin datos de contacto, de prueba o spam.\n- No dar asesoramiento legal, contable o impositivo.\n- No responder temas ajenos al rubro inmobiliario: indicá con amabilidad que solo podés ayudar con consultas de la inmobiliaria.\n\n# ESCALAMIENTO\nSi el cliente quiere negociar, reclama, plantea un tema legal o está molesto, respondé que un asesor humano lo va a contactar. Si dejó contacto, registralo con la calificación \"ESCALAR A ASESOR\".",
+          "maxIterations": 8,
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        496
+      ],
+      "id": "0d937744-2af9-490c-99da-6c6169853a77",
+      "name": "AI Agent - Calificador de Leads",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "id"
+        },
+        "options": {
+          "maxTokensToSample": 1024,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        224,
+        736
+      ],
+      "id": "fd4a668a-0212-44b9-892a-8804709b1b27",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "IntGeWHhh5txHNmz",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Registra un lead calificado en la base de consultas de Inmobiliaria Balbi (Notion) para que un asesor humano lo contacte y le dé seguimiento comercial.\n\nCUÁNDO USARLA (todas las condiciones):\n- El cliente mostró intención concreta de operar: comprar, vender, alquilar, tasar o visitar una propiedad.\n- La calificación es CALIENTE, TIBIO o ESCALAR A ASESOR.\n- El cliente ya dejó su nombre y al menos un dato de contacto (teléfono o correo).\nEjemplos: \"Soy Laura, quiero tasar mi departamento en Fisherton, mi cel es 341...\"; \"Busco alquilar un 2 ambientes en centro, presupuesto 600 mil, escribime a juan@...\".\n\nCUÁNDO NO USARLA:\n- Leads FRÍOS o consultas solo informativas (requisitos, horarios, cómo funciona una tasación).\n- Consultas sin nombre o sin dato de contacto: en ese caso primero pedile los datos al cliente.\n- Saludos, mensajes de prueba, spam o temas ajenos al rubro inmobiliario.\n- Si ya registraste a este cliente en la conversación.\n\nQUÉ COMPLETAR:\n- Título: \"Lead: <nombre> - <operación> - <calificación>\".\n- Resumen: contacto, operación, zona, presupuesto o plazo, calificación y resumen breve de la consulta.",
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "3d0f48dfcec2805aacb9e3f793393806",
+          "mode": "id"
+        },
+        "title": "={{ $fromAI('titulo', 'Título del lead con el formato: Lead: <nombre> - <operación> - <calificación>', 'string') }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "AI Output|rich_text",
+              "textContent": "={{ $fromAI('resumen', 'Resumen del lead: contacto, operación, zona, presupuesto o plazo, calificación y resumen de la consulta', 'string') }}"
+            },
+            {
+              "key": "Human Review|select",
+              "selectValue": "Pending Review"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        736
+      ],
+      "id": "2ac6859c-85c5-4e38-83ea-51765d6a036c",
+      "name": "Registrar Lead en Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "7WYRwK3qBIFEWbnH",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a1",
+              "name": "estado",
+              "value": "={{ $json.output ? '✅ Tarea completada' : '⚠️ Error del agente - escalado a asesor' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a2",
+              "name": "mensaje_cliente",
+              "value": "={{ $('Chat Trigger - Consulta del Cliente').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a3",
+              "name": "herramientas_usadas",
+              "value": "={{ ($json.intermediateSteps || []).map(s => s.action.tool).join(', ') || 'ninguna' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a4",
+              "name": "execution_log",
+              "value": "={{ ($json.intermediateSteps || []).map((s, i) => (i + 1) + '. ' + s.action.tool + ' → ' + String(s.observation).slice(0, 300)).join('\\n') || 'El agente respondió sin usar herramientas.' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a5",
+              "name": "respuesta",
+              "value": "={{ $json.output || 'Disculpe, en este momento no pudimos procesar su consulta. Un asesor de Inmobiliaria Balbi lo va a contactar a la brevedad.' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1000001-0000-4000-8000-0000000000a6",
+              "name": "detalle_error",
+              "value": "={{ $json.error?.message || $json.error || '-' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        496
+      ],
+      "id": "5064d391-b8c4-4634-9643-cda2c6979e66",
+      "name": "Registro de Auditoría"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BKK9KHR8C",
+          "mode": "list",
+          "cachedResultName": "todo-n8n"
+        },
+        "text": "=*{{ $json.estado }}* · Agente Calificador de Leads · Inmobiliaria Balbi\n\n*Mensaje del cliente:*\n{{ $json.mensaje_cliente }}\n\n*Herramientas usadas:* {{ $json.herramientas_usadas }}\n\n*Execution Log (pasos del agente):*\n{{ $json.execution_log }}\n\n*Respuesta enviada al cliente:*\n{{ $json.respuesta }}\n\n*Error:* {{ $json.detalle_error }}\n\n🕒 {{ $now.setZone('America/Argentina/Cordoba').toFormat('dd/MM/yyyy HH:mm') }} · Ejecución {{ $execution.id }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        496
+      ],
+      "id": "41d17bd7-525c-49e2-8cc6-86c9adfe40d7",
+      "name": "Slack - Log de Observabilidad",
+      "webhookId": "a1000001-0000-4000-8000-0000000000fe",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "HwWofHUySk1Bkxij",
+          "name": "Slack account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1000001-0000-4000-8000-0000000000f1",
+              "name": "output",
+              "value": "={{ $('Registro de Auditoría').item.json.respuesta }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        496
+      ],
+      "id": "eafcfc5e-cfa2-4c26-8ffb-ffdc85025411",
+      "name": "Respuesta al Chat"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger - Consulta del Cliente": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Calificador de Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Calificador de Leads",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Lead en Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - Calificador de Leads",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Calificador de Leads": {
+      "main": [
+        [
+          {
+            "node": "Registro de Auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registro de Auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registro de Auditoría": {
+      "main": [
+        [
+          {
+            "node": "Slack - Log de Observabilidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Log de Observabilidad": {
+      "main": [
+        [
+          {
+            "node": "Respuesta al Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ce6b6a7d-39d0-40ac-870e-58d571b637ca",
+  "meta": {
+    "instanceId": "d396b4afb37cb66cbb7804c56432cc0c06c8f299579eaab7ffd66ab275bdfcba"
+  },
+  "nodeGroups": [],
+  "id": "VfHNgsNiFdPoYgW8",
+  "tags": []
+}
